@@ -1,0 +1,21 @@
+# ---- DAPK Studio repo ----
+node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+repo/  # generated Codemagic upload package (rebuild via tools/sync-repo.ps1)
+
+# ---- Android (demo-app + generated projects) ----
+/demo-app/build/
+/demo-app/.gradle/
+/demo-app/local.properties
+/demo-app/app/build/
+**/build/
+**/.gradle/
+local.properties
+*.keystore
+*.jks
+
+# ---- Electron ----
+dist/

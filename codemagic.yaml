@@ -1,0 +1,113 @@
+# DAPK Studio repo — builds the demo Android app on Codemagic.
+#
+# WHAT THIS FILE DOES
+#   Workflow `demo-debug` compiles demo-app/ (a real Kotlin + Gradle project)
+#   into a debug .apk you can download from the Codemagic build page.
+#
+# HOW TO USE
+#   1. Push this folder to GitHub (root must contain codemagic.yaml + demo-app/).
+#   2. codemagic.io → Add application → connect the repo → choose Android.
+#   3. Codemagic auto-detects codemagic.yaml → Start new build → demo-debug.
+#   4. Download app-debug.apk from Artifacts. Install on any Android device.
+#
+# ZERO-SETUP PROMISE: the only thing you may ever edit in this file is the
+# email address below. No keystores, no bindings, no secret groups.
+# Debug APKs are auto-signed by Gradle; failure mails carry the build log link.
+# For a signed release build, see Codemagic docs "Signing Android apps".
+
+workflows:
+  demo-debug:
+    name: Demo App — Debug APK
+    instance_type: linux_x2
+    max_build_duration: 30
+    environment:
+      vars:
+        PACKAGE_NAME: "com.dapk.demo"
+        GRADLE_OPTS: "-Dorg.gradle.daemon=false -Xmx2g"
+    cache:
+      cache_paths:
+        - ~/.gradle
+    scripts:
+      - name: Show Java version
+        script: |
+          java -version || true
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+      - name: Set Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/demo-app/local.properties"
+      - name: Build debug APK
+        script: |
+          set -e
+          # Prefer JDK 17 (required by AGP 8.x) when several JDKs are installed
+          if [ -d /usr/lib/jvm/java-17-openjdk-amd64 ]; then
+            export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+            export PATH="$JAVA_HOME/bin:$PATH"
+          fi
+          java -version
+          # Self-contained Gradle (no wrapper jar committed to the repo)
+          if [ ! -x "$HOME/gradle-8.7/bin/gradle" ]; then
+            curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
+            rm -rf "$HOME/gradle-8.7" && unzip -q /tmp/gradle.zip -d "$HOME"
+          fi
+          cd demo-app
+          "$HOME/gradle-8.7/bin/gradle" assembleDebug --stacktrace
+    artifacts:
+      - demo-app/app/build/outputs/apk/debug/*.apk
+    publishing:
+      email:
+        recipients:
+          - you@example.com  # <-- REPLACE with your email. That is the entire setup.
+        notify:
+          success: true   # APK arrives as an email attachment on every green build
+          failure: true   # failures mail you the log link instead
+
+  demo-aab:
+    name: Demo App — Debug Bundle (.aab)
+    instance_type: linux_x2
+    max_build_duration: 30
+    environment:
+      vars:
+        PACKAGE_NAME: "com.dapk.demo"
+        GRADLE_OPTS: "-Dorg.gradle.daemon=false -Xmx2g"
+    cache:
+      cache_paths:
+        - ~/.gradle
+    scripts:
+      - name: Set Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/demo-app/local.properties"
+      - name: Build debug bundle
+        script: |
+          set -e
+          if [ -d /usr/lib/jvm/java-17-openjdk-amd64 ]; then
+            export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+            export PATH="$JAVA_HOME/bin:$PATH"
+          fi
+          if [ ! -x "$HOME/gradle-8.7/bin/gradle" ]; then
+            curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
+            rm -rf "$HOME/gradle-8.7" && unzip -q /tmp/gradle.zip -d "$HOME"
+          fi
+          cd demo-app
+          "$HOME/gradle-8.7/bin/gradle" bundleDebug --stacktrace
+    artifacts:
+      - demo-app/app/build/outputs/bundle/debug/*.aab
+
+  studio-smoke:
+    name: Studio Self-Test (skips cleanly in demo-only repos)
+    instance_type: linux_x2
+    max_build_duration: 10
+    scripts:
+      - name: Self-test (studio sources if present, demo XML always)
+        script: |
+          set -e
+          if [ -f js/app.js ]; then
+            for f in js/app.js js/builder.js js/projects.js js/theme.js js/templates.js electron/main.js electron/preload.js; do
+              node --check "$f" || exit 1
+            done
+            echo SMOKE-JS-OK
+          else
+            echo "No studio sources in this repo (demo-only package) — JS check skipped."
+          fi
+          python3 -c "import xml.dom.minidom,glob; fs=glob.glob('demo-app/app/src/main/**/*.xml',recursive=True); assert fs; [xml.dom.minidom.parse(f) for f in fs]; print('SMOKE-XML-OK',len(fs))"
+          python3 -m pip install --quiet pyyaml
+          python3 -c "import yaml; d=yaml.safe_load(open('codemagic.yaml')); print('SMOKE-YAML-OK',list(d['workflows'].keys()))"
