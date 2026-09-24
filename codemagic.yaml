@@ -49,7 +49,7 @@ workflows:
             curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
             rm -rf "$HOME/gradle-8.7" && unzip -q /tmp/gradle.zip -d "$HOME"
           fi
-          cd demo-app
+          cd "$CM_BUILD_DIR/demo-app"
           "$HOME/gradle-8.7/bin/gradle" assembleDebug --stacktrace
     artifacts:
       - demo-app/app/build/outputs/apk/debug/*.apk
@@ -87,7 +87,7 @@ workflows:
             curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
             rm -rf "$HOME/gradle-8.7" && unzip -q /tmp/gradle.zip -d "$HOME"
           fi
-          cd demo-app
+          cd "$CM_BUILD_DIR/demo-app"
           "$HOME/gradle-8.7/bin/gradle" bundleDebug --stacktrace
     artifacts:
       - demo-app/app/build/outputs/bundle/debug/*.aab
